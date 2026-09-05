@@ -1,6 +1,7 @@
 'use client'
 
-import { useId } from 'react'
+import { useId, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useEstimate } from '@/components/estimate-context'
 import { TIER_LABELS, formatNum, type Tier } from '@/lib/estimate'
 
@@ -10,9 +11,21 @@ const DIMENSIONS: { key: 'width' | 'length' | 'height'; label: string; hint: str
   { key: 'height', label: 'Balandlik', hint: 'H', min: 2, max: 6 },
 ]
 
+const OPENINGS: {
+  group: 'Eshik' | 'Deraza'
+  countKey: 'doorCount' | 'windowCount'
+  widthKey: 'doorWidth' | 'windowWidth'
+  heightKey: 'doorHeight' | 'windowHeight'
+  maxCount: number
+}[] = [
+  { group: 'Eshik', countKey: 'doorCount', widthKey: 'doorWidth', heightKey: 'doorHeight', maxCount: 6 },
+  { group: 'Deraza', countKey: 'windowCount', widthKey: 'windowWidth', heightKey: 'windowHeight', maxCount: 8 },
+]
+
 export function Calculator() {
   const { input, result, setDimension, setTier } = useEstimate()
   const baseId = useId()
+  const [openingsOpen, setOpeningsOpen] = useState(false)
 
   return (
     <section id="kalkulyator" className="scroll-mt-14">
@@ -28,7 +41,9 @@ export function Calculator() {
           <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-3">
               <span className="h-px w-5 bg-wood" aria-hidden="true" />
-              Standart eshik 0.90 × 2.10 m va deraza 1.50 × 1.40 m hisobga olinadi
+              {input.doorCount} ta eshik ({formatNum(input.doorWidth, 2)}×{formatNum(input.doorHeight, 2)} m) va{' '}
+              {input.windowCount} ta deraza ({formatNum(input.windowWidth, 2)}×{formatNum(input.windowHeight, 2)} m)
+              hisobga olinadi
             </li>
             <li className="flex items-center gap-3">
               <span className="h-px w-5 bg-wood" aria-hidden="true" />
@@ -127,6 +142,80 @@ export function Calculator() {
               })}
             </div>
           </fieldset>
+
+          <div className="border-t border-foreground">
+            <button
+              type="button"
+              onClick={() => setOpeningsOpen((s) => !s)}
+              className="flex w-full items-center justify-between px-5 py-3 text-left"
+              aria-expanded={openingsOpen}
+            >
+              <span className="font-heading text-sm font-semibold">Eshik / deraza sozlamalari</span>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform ${openingsOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+            {openingsOpen && (
+              <div className="grid gap-5 border-t border-border p-5 sm:grid-cols-2">
+                {OPENINGS.map((o) => (
+                  <div key={o.group} className="flex flex-col gap-3">
+                    <span className="text-sm font-medium">{o.group}</span>
+                    <div className="flex flex-col gap-1.5">
+                      <label htmlFor={`${baseId}-${o.countKey}`} className="text-xs text-muted-foreground">
+                        Soni
+                      </label>
+                      <input
+                        id={`${baseId}-${o.countKey}`}
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={o.maxCount}
+                        step={1}
+                        value={input[o.countKey]}
+                        onChange={(e) => setDimension(o.countKey, parseInt(e.target.value, 10) || 0)}
+                        className="border-b-2 border-foreground bg-transparent py-1 tabular font-heading text-lg font-semibold outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor={`${baseId}-${o.widthKey}`} className="text-xs text-muted-foreground">
+                          Kengligi, m
+                        </label>
+                        <input
+                          id={`${baseId}-${o.widthKey}`}
+                          type="number"
+                          inputMode="decimal"
+                          min={0.3}
+                          max={4}
+                          step={0.05}
+                          value={input[o.widthKey]}
+                          onChange={(e) => setDimension(o.widthKey, parseFloat(e.target.value) || 0)}
+                          className="border-b-2 border-foreground bg-transparent py-1 tabular outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor={`${baseId}-${o.heightKey}`} className="text-xs text-muted-foreground">
+                          Balandligi, m
+                        </label>
+                        <input
+                          id={`${baseId}-${o.heightKey}`}
+                          type="number"
+                          inputMode="decimal"
+                          min={0.3}
+                          max={3}
+                          step={0.05}
+                          value={input[o.heightKey]}
+                          onChange={(e) => setDimension(o.heightKey, parseFloat(e.target.value) || 0)}
+                          className="border-b-2 border-foreground bg-transparent py-1 tabular outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-col gap-3 border-t border-foreground p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col">

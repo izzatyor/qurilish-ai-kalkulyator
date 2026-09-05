@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Download, Share2, BookmarkPlus, Check, Loader2, X, RotateCcw } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
+import { Download, Share2, BookmarkPlus, Check, Loader2, X, RotateCcw, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useEstimate } from '@/components/estimate-context'
 import { useAuth } from '@/components/auth-context'
@@ -9,10 +9,31 @@ import { saveCalculation } from '@/lib/calculations'
 import { TIER_LABELS, formatNum, formatUZS } from '@/lib/estimate'
 
 export function BudgetBreakdown() {
-  const { input, result, toggleMaterial } = useEstimate()
+  const {
+    input,
+    result,
+    toggleMaterial,
+    setQty,
+    resetQty,
+    addCustomMaterial,
+    updateCustomMaterial,
+    removeCustomMaterial,
+  } = useEstimate()
   const { user } = useAuth()
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle')
+  const [addOpen, setAddOpen] = useState(false)
+  const [form, setForm] = useState({ name: '', spec: '', qty: '1', unit: 'dona', unitPrice: '' })
+
+  const handleAddSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    const qty = parseFloat(form.qty)
+    const unitPrice = parseFloat(form.unitPrice)
+    if (!form.name.trim() || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) return
+    addCustomMaterial({ name: form.name.trim(), spec: form.spec.trim(), qty, unit: form.unit.trim() || 'dona', unitPrice })
+    setForm({ name: '', spec: '', qty: '1', unit: 'dona', unitPrice: '' })
+    setAddOpen(false)
+  }
 
   const handleSave = async () => {
     if (!user) return
@@ -157,47 +178,95 @@ export function BudgetBreakdown() {
                 </tr>
               </thead>
               <tbody>
-                {result.materials.map((m, i) => (
-                  <tr
-                    key={m.id}
-                    className={`border-b border-primary-foreground/20 ${
-                      m.excluded ? 'opacity-40 print:hidden' : ''
-                    }`}
-                  >
-                    <td className="tabular py-3 pr-3 text-primary-foreground/50">{String(i + 1).padStart(2, '0')}</td>
-                    <td className="py-3 pr-3">
-                      <div className={`font-medium ${m.excluded ? 'line-through' : ''}`}>{m.name}</div>
-                      <div className="text-xs text-primary-foreground/60">
-                        {m.spec}
-                        {m.excluded && <span className="ml-2 text-accent">· olib tashlandi</span>}
-                      </div>
-                    </td>
-                    <td className="tabular py-3 pr-3 text-right font-heading">
-                      {formatNum(m.qty, 1)} <span className="text-xs text-primary-foreground/60">{m.unit}</span>
-                    </td>
-                    <td className="tabular py-3 pr-3 text-right text-primary-foreground/80">
-                      {m.unitPrice.toLocaleString('ru-RU')}
-                    </td>
-                    <td className="tabular py-3 text-right font-heading font-semibold">
-                      {m.total.toLocaleString('ru-RU')}
-                    </td>
-                    <td className="py-3 pl-3 text-right print:hidden">
-                      <button
-                        type="button"
-                        onClick={() => toggleMaterial(m.id)}
-                        aria-label={m.excluded ? `${m.name} qaytarish` : `${m.name} olib tashlash`}
-                        title={m.excluded ? 'Qaytarish' : 'Kerak emas'}
-                        className="inline-flex h-7 w-7 items-center justify-center border border-primary-foreground/40 text-primary-foreground/70 transition-colors hover:border-accent hover:text-accent"
-                      >
-                        {m.excluded ? (
-                          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                {result.materials.map((m, i) => {
+                  const isCustom = m.id.startsWith('custom-')
+                  return (
+                    <tr
+                      key={m.id}
+                      className={`border-b border-primary-foreground/20 ${
+                        m.excluded ? 'opacity-40 print:hidden' : ''
+                      }`}
+                    >
+                      <td className="tabular py-3 pr-3 text-primary-foreground/50">{String(i + 1).padStart(2, '0')}</td>
+                      <td className="py-3 pr-3">
+                        <div className={`font-medium ${m.excluded ? 'line-through' : ''}`}>
+                          {m.name}
+                          {isCustom && <span className="ml-2 text-xs font-normal text-accent">· qo‘lda qo‘shilgan</span>}
+                        </div>
+                        <div className="text-xs text-primary-foreground/60">
+                          {m.spec}
+                          {m.excluded && <span className="ml-2 text-accent">· olib tashlandi</span>}
+                        </div>
+                      </td>
+                      <td className="tabular py-3 pr-3 text-right font-heading">
+                        <div className="flex items-center justify-end gap-1.5 print:hidden">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            step={0.1}
+                            value={m.qty}
+                            disabled={m.excluded}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value)
+                              if (!Number.isFinite(v) || v < 0) return
+                              isCustom ? updateCustomMaterial(m.id, { qty: v }) : setQty(m.id, v)
+                            }}
+                            className="w-16 border-b border-primary-foreground/40 bg-transparent py-0.5 text-right tabular outline-none focus:border-accent disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                          <span className="text-xs text-primary-foreground/60">{m.unit}</span>
+                          {!isCustom && (
+                            <button
+                              type="button"
+                              onClick={() => resetQty(m.id)}
+                              title="Avtomatik hisoblangan miqdorga qaytarish"
+                              aria-label="Avtomatik miqdorga qaytarish"
+                              className="text-primary-foreground/40 transition-colors hover:text-accent"
+                            >
+                              <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
+                        <span className="hidden print:inline">
+                          {formatNum(m.qty, 1)} {m.unit}
+                        </span>
+                      </td>
+                      <td className="tabular py-3 pr-3 text-right text-primary-foreground/80">
+                        {m.unitPrice.toLocaleString('ru-RU')}
+                      </td>
+                      <td className="tabular py-3 text-right font-heading font-semibold">
+                        {m.total.toLocaleString('ru-RU')}
+                      </td>
+                      <td className="py-3 pl-3 text-right print:hidden">
+                        {isCustom ? (
+                          <button
+                            type="button"
+                            onClick={() => removeCustomMaterial(m.id)}
+                            aria-label={`${m.name} o‘chirish`}
+                            title="Butunlay o‘chirish"
+                            className="inline-flex h-7 w-7 items-center justify-center border border-primary-foreground/40 text-primary-foreground/70 transition-colors hover:border-accent hover:text-accent"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
                         ) : (
-                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                          <button
+                            type="button"
+                            onClick={() => toggleMaterial(m.id)}
+                            aria-label={m.excluded ? `${m.name} qaytarish` : `${m.name} olib tashlash`}
+                            title={m.excluded ? 'Qaytarish' : 'Kerak emas'}
+                            className="inline-flex h-7 w-7 items-center justify-center border border-primary-foreground/40 text-primary-foreground/70 transition-colors hover:border-accent hover:text-accent"
+                          >
+                            {m.excluded ? (
+                              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                            ) : (
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            )}
+                          </button>
                         )}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-b border-primary-foreground/60">
@@ -211,6 +280,94 @@ export function BudgetBreakdown() {
                 </tr>
               </tfoot>
             </table>
+            </div>
+
+            <div className="mt-4 print:hidden">
+              {!addOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(true)}
+                  className="inline-flex items-center gap-2 border border-dashed border-primary-foreground/40 px-4 py-2 text-sm text-primary-foreground/80 transition-colors hover:border-accent hover:text-accent"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Material qo‘shish
+                </button>
+              ) : (
+                <form
+                  onSubmit={handleAddSubmit}
+                  className="grid gap-3 border border-primary-foreground/40 p-4 sm:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_0.9fr_auto]"
+                >
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-primary-foreground/60">Nomi</label>
+                    <input
+                      required
+                      value={form.name}
+                      onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                      placeholder="Masalan: Kafel"
+                      className="border-b-2 border-primary-foreground/50 bg-transparent py-1 text-sm outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-primary-foreground/60">Tavsif (ixtiyoriy)</label>
+                    <input
+                      value={form.spec}
+                      onChange={(e) => setForm((s) => ({ ...s, spec: e.target.value }))}
+                      placeholder="Masalan: 30×30 sm"
+                      className="border-b-2 border-primary-foreground/50 bg-transparent py-1 text-sm outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-primary-foreground/60">Miqdor</label>
+                    <input
+                      required
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step={0.1}
+                      value={form.qty}
+                      onChange={(e) => setForm((s) => ({ ...s, qty: e.target.value }))}
+                      className="border-b-2 border-primary-foreground/50 bg-transparent py-1 text-sm tabular outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-primary-foreground/60">Birlik</label>
+                    <input
+                      value={form.unit}
+                      onChange={(e) => setForm((s) => ({ ...s, unit: e.target.value }))}
+                      placeholder="dona / m² / qop"
+                      className="border-b-2 border-primary-foreground/50 bg-transparent py-1 text-sm outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-primary-foreground/60">Narxi, so‘m</label>
+                    <input
+                      required
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step={500}
+                      value={form.unitPrice}
+                      onChange={(e) => setForm((s) => ({ ...s, unitPrice: e.target.value }))}
+                      className="border-b-2 border-primary-foreground/50 bg-transparent py-1 text-sm tabular outline-none focus:border-accent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="submit"
+                      className="inline-flex h-9 items-center justify-center bg-accent px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#d4551f]"
+                    >
+                      Qo‘shish
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddOpen(false)}
+                      className="inline-flex h-9 items-center justify-center border border-primary-foreground/40 px-3 text-sm text-primary-foreground/70 hover:text-primary-foreground"
+                    >
+                      Bekor
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
 

@@ -7,6 +7,25 @@ export interface RoomInput {
   length: number // m
   height: number // m
   tier: Tier
+  doorCount: number
+  doorWidth: number
+  doorHeight: number
+  windowCount: number
+  windowWidth: number
+  windowHeight: number
+}
+
+export const DEFAULT_ROOM_INPUT: RoomInput = {
+  width: 4.2,
+  length: 3.5,
+  height: 2.8,
+  tier: 'standart',
+  doorCount: 1,
+  doorWidth: 0.9,
+  doorHeight: 2.1,
+  windowCount: 1,
+  windowWidth: 1.5,
+  windowHeight: 1.4,
 }
 
 export interface MaterialLine {
@@ -33,6 +52,16 @@ export interface Estimate {
   total: number
 }
 
+/** Foydalanuvchi o'zi qo'lda qo'shgan material (Supabase katalogida bo'lmasligi ham mumkin). */
+export interface CustomMaterial {
+  id: string
+  name: string
+  spec: string
+  qty: number
+  unit: string
+  unitPrice: number
+}
+
 const DOOR = { w: 0.9, h: 2.1 }
 const WINDOW = { w: 1.5, h: 1.4 }
 
@@ -54,6 +83,9 @@ export const TIER_LABELS = Object.fromEntries(
 /** Material ID -> birlik narxi (standart tier uchun so'mda). */
 export type PriceMap = Record<string, number>
 
+/** Material ID -> foydalanuvchi qo'lda kiritgan miqdor (avtomatik hisoblangan miqdorni bekor qiladi). */
+export type QtyOverrides = Record<string, number>
+
 /**
  * Statik MATERIALS ro'yxatidan yasalgan standart narxlar.
  * Supabase'dan narx olishning iloji bo'lmasa (masalan tarmoq xatosi),
@@ -64,7 +96,12 @@ export const DEFAULT_PRICES: PriceMap = Object.fromEntries(MATERIALS.map((m) => 
 const roundTo = (n: number, step: number) => Math.round(n / step) * step
 const ceil = (n: number) => Math.ceil(n - 1e-9)
 
-export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES, excludedIds: string[] = []): Estimate {
+export function estimate(
+  input: RoomInput,
+  prices: PriceMap = DEFAULT_PRICES,
+  excludedIds: string[] = [],
+  qtyOverrides: QtyOverrides = {},
+): Estimate {
   const w = clamp(input.width, 1, 30)
   const l = clamp(input.length, 1, 30)
   const h = clamp(input.height, 2, 6)
@@ -72,17 +109,23 @@ export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES, ex
   const f = tier.priceFactor
   const excluded = new Set(excludedIds)
 
+  const doorCount = clamp(input.doorCount ?? 1, 0, 10)
+  const doorArea = clamp(input.doorWidth ?? DOOR.w, 0.5, 3) * clamp(input.doorHeight ?? DOOR.h, 1.5, 3)
+  const windowCount = clamp(input.windowCount ?? 1, 0, 10)
+  const windowArea = clamp(input.windowWidth ?? WINDOW.w, 0.3, 4) * clamp(input.windowHeight ?? WINDOW.h, 0.3, 3)
+
   const floorArea = w * l
   const ceilingArea = floorArea
   const perimeter = 2 * (w + l)
-  const wallArea = Math.max(perimeter * h - DOOR.w * DOOR.h - WINDOW.w * WINDOW.h, 0)
+  const wallArea = Math.max(perimeter * h - doorCount * doorArea - windowCount * windowArea, 0)
 
   /** Supabase'dan kelgan narx bo'lsa o'shani, bo'lmasa statik defaultni ishlatadi. */
   const priceOf = (id: string) => prices[id] ?? DEFAULT_PRICES[id] ?? 0
 
   const materials: MaterialLine[] = []
-  const add = (id: string, name: string, spec: string, qty: number, unit: string) => {
+  const add = (id: string, name: string, spec: string, autoQty: number, unit: string) => {
     const price = roundTo(priceOf(id) * f, 500)
+    const qty = qtyOverrides[id] ?? autoQty
     materials.push({ id, name, spec, qty, unit, unitPrice: price, total: qty * price, excluded: excluded.has(id) })
   }
 
@@ -91,7 +134,7 @@ export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES, ex
   // Underlay
   add('tagqoplama', 'Tagqoplama', 'Poliuretan 3 mm', ceil(floorArea * 1.05 * 10) / 10, 'm²')
   // Skirting boards, 2.5 m planks
-  add('plintus', 'Plintus', 'MDF 80 mm, 2.5 m', ceil((perimeter - DOOR.w) / 2.5), 'dona')
+  add('plintus', 'Plintus', 'MDF 80 mm, 2.5 m', ceil((perimeter - doorCount * (input.doorWidth ?? DOOR.w)) / 2.5), 'dona')
   // Putty: 1.2 kg/m² on walls + ceiling, 25 kg bags
   add('shpaklyovka', 'Shpaklyovka', 'Knauf 25 kg', ceil(((wallArea + ceilingArea) * 1.2) / 25), 'qop')
   // Primer: 0.15 L/m², 10 L cans
@@ -110,6 +153,34 @@ export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES, ex
   const total = materialsTotal + labor + reserve
 
   return { floorArea, wallArea, ceilingArea, perimeter, materials, materialsTotal, labor, reserve, total }
+}
+
+/**
+ * Foydalanuvchi qo'lda qo'shgan materiallarni asosiy hisob-kitobga qo'shib,
+ * summalarni qayta hisoblaydi. Custom materiallar ham "olib tashlash" (excluded)
+ * imkoniyatiga ega — shuning uchun excludedIds shu yerga ham beriladi.
+ */
+export function combineWithCustom(base: Estimate, custom: CustomMaterial[], excludedIds: string[] = []): Estimate {
+  if (custom.length === 0) return base
+  const excluded = new Set(excludedIds)
+
+  const customLines: MaterialLine[] = custom.map((c) => ({
+    id: c.id,
+    name: c.name,
+    spec: c.spec,
+    qty: c.qty,
+    unit: c.unit,
+    unitPrice: c.unitPrice,
+    total: c.qty * c.unitPrice,
+    excluded: excluded.has(c.id),
+  }))
+
+  const materials = [...base.materials, ...customLines]
+  const materialsTotal = materials.filter((m) => !m.excluded).reduce((s, m) => s + m.total, 0)
+  const reserve = roundTo((materialsTotal + base.labor) * 0.1, 10_000)
+  const total = materialsTotal + base.labor + reserve
+
+  return { ...base, materials, materialsTotal, reserve, total }
 }
 
 function clamp(n: number, min: number, max: number) {
