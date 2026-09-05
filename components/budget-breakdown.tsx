@@ -12,6 +12,7 @@ export function BudgetBreakdown() {
   const { input, result } = useEstimate()
   const { user } = useAuth()
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [shareState, setShareState] = useState<'idle' | 'copied'>('idle')
 
   const handleSave = async () => {
     if (!user) return
@@ -26,6 +27,31 @@ export function BudgetBreakdown() {
     }
   }
 
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleShare = async () => {
+    const shareData = {
+      title: 'Smeta AI — ta‘mirlash smetasi',
+      text: `Mening ${formatNum(input.width, 1)}×${formatNum(input.length, 1)} m xonam uchun taxminiy byudjet: ${formatUZS(result.total)}`,
+      url: typeof window !== 'undefined' ? window.location.href : '',
+    }
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share(shareData)
+      } catch {
+        // Foydalanuvchi ulashishni bekor qilgan bo'lishi mumkin — bu xato emas
+      }
+      return
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`)
+      setShareState('copied')
+      setTimeout(() => setShareState('idle'), 2500)
+    }
+  }
+
   const segments = [
     { label: 'Materiallar', value: result.materialsTotal, color: 'bg-primary-foreground' },
     { label: 'Ish haqi', value: result.labor, color: 'bg-accent' },
@@ -33,8 +59,14 @@ export function BudgetBreakdown() {
   ]
 
   return (
-    <section id="materiallar" className="bg-grid-dark scroll-mt-14 text-primary-foreground">
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
+    <section id="materiallar" className="bg-grid-dark scroll-mt-14 text-primary-foreground print:bg-white print:text-foreground">
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20 print:px-0 print:py-6">
+        <div className="mb-8 hidden items-center gap-2.5 print:flex">
+          <span className="font-heading text-lg font-bold">Smeta AI</span>
+          <span className="text-sm text-muted-foreground">
+            — {new Date().toLocaleDateString('uz-UZ', { day: '2-digit', month: 'long', year: 'numeric' })}
+          </span>
+        </div>
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-col gap-3">
             <p className="flex items-center gap-3 text-sm text-primary-foreground/70">
@@ -45,7 +77,7 @@ export function BudgetBreakdown() {
               Materiallar va byudjet taqsimoti
             </h2>
           </div>
-          <div className="flex gap-px">
+          <div className="flex gap-px print:hidden">
             {user ? (
               <button
                 type="button"
@@ -71,6 +103,7 @@ export function BudgetBreakdown() {
             )}
             <button
               type="button"
+              onClick={handlePrint}
               className="inline-flex h-10 items-center gap-2 border border-l-0 border-primary-foreground/50 px-4 text-sm transition-colors hover:bg-primary-foreground hover:text-primary"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
@@ -78,10 +111,15 @@ export function BudgetBreakdown() {
             </button>
             <button
               type="button"
+              onClick={handleShare}
               className="inline-flex h-10 items-center gap-2 border border-l-0 border-primary-foreground/50 px-4 text-sm transition-colors hover:bg-primary-foreground hover:text-primary"
             >
-              <Share2 className="h-4 w-4" aria-hidden="true" />
-              Ulashish
+              {shareState === 'copied' ? (
+                <Check className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+              )}
+              {shareState === 'copied' ? 'Nusxalandi' : 'Ulashish'}
             </button>
           </div>
         </div>

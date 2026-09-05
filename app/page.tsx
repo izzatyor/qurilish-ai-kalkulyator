@@ -10,24 +10,32 @@ import { DimensionDivider } from '@/components/dimension-divider'
 export default function Page() {
   return (
     <EstimateProvider>
-      <SiteHeader />
+      <div className="print:hidden">
+        <SiteHeader />
+      </div>
       <main>
-        <Hero />
-        <div className="pt-8">
-          <DimensionDivider label="01 · Kirish ma‘lumotlari" note="A × B × H" />
-        </div>
-        <Calculator />
-        <div className="pb-8">
-          <DimensionDivider label="02 · Hisob-kitob" note="m² → so‘m" />
+        <div className="print:hidden">
+          <Hero />
+          <div className="pt-8">
+            <DimensionDivider label="01 · Kirish ma‘lumotlari" note="A × B × H" />
+          </div>
+          <Calculator />
+          <div className="pb-8">
+            <DimensionDivider label="02 · Hisob-kitob" note="m² → so‘m" />
+          </div>
         </div>
         <BudgetBreakdown />
-        <div className="pt-8">
-          <DimensionDivider label="03 · Jarayon" />
+        <div className="print:hidden">
+          <div className="pt-8">
+            <DimensionDivider label="03 · Jarayon" />
+          </div>
+          <HowItWorks />
+          <FinalCta />
         </div>
-        <HowItWorks />
-        <FinalCta />
       </main>
-      <SiteFooter />
+      <div className="print:hidden">
+        <SiteFooter />
+      </div>
     </EstimateProvider>
   )
 }
