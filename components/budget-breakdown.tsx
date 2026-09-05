@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Share2, BookmarkPlus, Check, Loader2 } from 'lucide-react'
+import { Download, Share2, BookmarkPlus, Check, Loader2, X, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { useEstimate } from '@/components/estimate-context'
 import { useAuth } from '@/components/auth-context'
@@ -9,7 +9,7 @@ import { saveCalculation } from '@/lib/calculations'
 import { TIER_LABELS, formatNum, formatUZS } from '@/lib/estimate'
 
 export function BudgetBreakdown() {
-  const { input, result } = useEstimate()
+  const { input, result, toggleMaterial } = useEstimate()
   const { user } = useAuth()
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle')
@@ -126,7 +126,12 @@ export function BudgetBreakdown() {
 
         <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr] lg:gap-12">
           {/* Materials table */}
-          <div className="overflow-x-auto">
+          <div>
+            <p className="mb-3 text-xs text-primary-foreground/60 print:hidden">
+              Kerak bo‘lmagan materialni <span className="font-medium text-primary-foreground">✕</span> tugmasi orqali
+              olib tashlang — byudjet avtomatik qayta hisoblanadi.
+            </p>
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] border-collapse text-sm">
               <caption className="sr-only">Materiallar ro‘yxati va narxlari</caption>
               <thead>
@@ -146,15 +151,26 @@ export function BudgetBreakdown() {
                   <th scope="col" className="py-2.5 text-right font-normal">
                     Jami
                   </th>
+                  <th scope="col" className="py-2.5 pl-3 font-normal print:hidden">
+                    <span className="sr-only">Amal</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {result.materials.map((m, i) => (
-                  <tr key={m.name} className="border-b border-primary-foreground/20">
+                  <tr
+                    key={m.id}
+                    className={`border-b border-primary-foreground/20 ${
+                      m.excluded ? 'opacity-40 print:hidden' : ''
+                    }`}
+                  >
                     <td className="tabular py-3 pr-3 text-primary-foreground/50">{String(i + 1).padStart(2, '0')}</td>
                     <td className="py-3 pr-3">
-                      <div className="font-medium">{m.name}</div>
-                      <div className="text-xs text-primary-foreground/60">{m.spec}</div>
+                      <div className={`font-medium ${m.excluded ? 'line-through' : ''}`}>{m.name}</div>
+                      <div className="text-xs text-primary-foreground/60">
+                        {m.spec}
+                        {m.excluded && <span className="ml-2 text-accent">· olib tashlandi</span>}
+                      </div>
                     </td>
                     <td className="tabular py-3 pr-3 text-right font-heading">
                       {formatNum(m.qty, 1)} <span className="text-xs text-primary-foreground/60">{m.unit}</span>
@@ -164,6 +180,21 @@ export function BudgetBreakdown() {
                     </td>
                     <td className="tabular py-3 text-right font-heading font-semibold">
                       {m.total.toLocaleString('ru-RU')}
+                    </td>
+                    <td className="py-3 pl-3 text-right print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleMaterial(m.id)}
+                        aria-label={m.excluded ? `${m.name} qaytarish` : `${m.name} olib tashlash`}
+                        title={m.excluded ? 'Qaytarish' : 'Kerak emas'}
+                        className="inline-flex h-7 w-7 items-center justify-center border border-primary-foreground/40 text-primary-foreground/70 transition-colors hover:border-accent hover:text-accent"
+                      >
+                        {m.excluded ? (
+                          <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -176,9 +207,11 @@ export function BudgetBreakdown() {
                   <td className="tabular py-3 text-right font-heading font-semibold">
                     {result.materialsTotal.toLocaleString('ru-RU')}
                   </td>
+                  <td className="print:hidden" />
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
 
           {/* Summary */}

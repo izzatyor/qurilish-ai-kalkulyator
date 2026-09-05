@@ -10,12 +10,15 @@ export interface RoomInput {
 }
 
 export interface MaterialLine {
+  id: string
   name: string
   spec: string
   qty: number
   unit: string
   unitPrice: number
   total: number
+  /** true bo'lsa, foydalanuvchi bu materialni ro'yxatdan olib tashlagan — summaga qo'shilmaydi */
+  excluded: boolean
 }
 
 export interface Estimate {
@@ -61,12 +64,13 @@ export const DEFAULT_PRICES: PriceMap = Object.fromEntries(MATERIALS.map((m) => 
 const roundTo = (n: number, step: number) => Math.round(n / step) * step
 const ceil = (n: number) => Math.ceil(n - 1e-9)
 
-export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES): Estimate {
+export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES, excludedIds: string[] = []): Estimate {
   const w = clamp(input.width, 1, 30)
   const l = clamp(input.length, 1, 30)
   const h = clamp(input.height, 2, 6)
   const tier = TIERS[input.tier]
   const f = tier.priceFactor
+  const excluded = new Set(excludedIds)
 
   const floorArea = w * l
   const ceilingArea = floorArea
@@ -79,7 +83,7 @@ export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES): E
   const materials: MaterialLine[] = []
   const add = (id: string, name: string, spec: string, qty: number, unit: string) => {
     const price = roundTo(priceOf(id) * f, 500)
-    materials.push({ name, spec, qty, unit, unitPrice: price, total: qty * price })
+    materials.push({ id, name, spec, qty, unit, unitPrice: price, total: qty * price, excluded: excluded.has(id) })
   }
 
   // Floor covering with 8% waste allowance
@@ -99,7 +103,8 @@ export function estimate(input: RoomInput, prices: PriceMap = DEFAULT_PRICES): E
   // Serpyanka / tape for joints, 45 m rolls
   add('serpyanka', 'Serpyanka lenta', '45 m rulon', ceil(perimeter / 45) + 1, 'rulon')
 
-  const materialsTotal = materials.reduce((s, m) => s + m.total, 0)
+  // Faqat olib tashlanMAGAN materiallar summaga qo'shiladi
+  const materialsTotal = materials.filter((m) => !m.excluded).reduce((s, m) => s + m.total, 0)
   const labor = roundTo(floorArea * tier.laborPerM2, 10_000)
   const reserve = roundTo((materialsTotal + labor) * 0.1, 10_000)
   const total = materialsTotal + labor + reserve
