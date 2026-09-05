@@ -1,11 +1,30 @@
 'use client'
 
-import { Download, Share2 } from 'lucide-react'
+import { useState } from 'react'
+import { Download, Share2, BookmarkPlus, Check, Loader2 } from 'lucide-react'
+import Link from 'next/link'
 import { useEstimate } from '@/components/estimate-context'
+import { useAuth } from '@/components/auth-context'
+import { saveCalculation } from '@/lib/calculations'
 import { TIER_LABELS, formatNum, formatUZS } from '@/lib/estimate'
 
 export function BudgetBreakdown() {
   const { input, result } = useEstimate()
+  const { user } = useAuth()
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
+  const handleSave = async () => {
+    if (!user) return
+    setSaveState('saving')
+    try {
+      await saveCalculation(user.id, input, result)
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 3000)
+    } catch (e) {
+      console.error(e)
+      setSaveState('error')
+    }
+  }
 
   const segments = [
     { label: 'Materiallar', value: result.materialsTotal, color: 'bg-primary-foreground' },
@@ -27,9 +46,32 @@ export function BudgetBreakdown() {
             </h2>
           </div>
           <div className="flex gap-px">
+            {user ? (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saveState === 'saving'}
+                className="inline-flex h-10 items-center gap-2 border border-primary-foreground/50 px-4 text-sm transition-colors hover:bg-primary-foreground hover:text-primary disabled:opacity-60"
+              >
+                {saveState === 'saving' && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {saveState === 'saved' && <Check className="h-4 w-4" aria-hidden="true" />}
+                {(saveState === 'idle' || saveState === 'error') && (
+                  <BookmarkPlus className="h-4 w-4" aria-hidden="true" />
+                )}
+                {saveState === 'saved' ? 'Saqlandi' : saveState === 'error' ? 'Xatolik, qayta urinib ko‘ring' : 'Saqlash'}
+              </button>
+            ) : (
+              <Link
+                href="/kirish"
+                className="inline-flex h-10 items-center gap-2 border border-primary-foreground/50 px-4 text-sm transition-colors hover:bg-primary-foreground hover:text-primary"
+              >
+                <BookmarkPlus className="h-4 w-4" aria-hidden="true" />
+                Saqlash uchun kiring
+              </Link>
+            )}
             <button
               type="button"
-              className="inline-flex h-10 items-center gap-2 border border-primary-foreground/50 px-4 text-sm transition-colors hover:bg-primary-foreground hover:text-primary"
+              className="inline-flex h-10 items-center gap-2 border border-l-0 border-primary-foreground/50 px-4 text-sm transition-colors hover:bg-primary-foreground hover:text-primary"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               PDF yuklab olish

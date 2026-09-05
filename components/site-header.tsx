@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Ruler } from 'lucide-react'
 import { AuthStatus } from '@/components/auth-status'
+import { HistoryLink } from '@/components/history-link'
 
 export function SiteHeader() {
   return (
@@ -24,6 +25,7 @@ export function SiteHeader() {
           <Link href="/#qanday" className="text-foreground/80 transition-colors hover:text-foreground">
             Qanday ishlaydi
           </Link>
+          <HistoryLink />
         </nav>
 
         <AuthStatus />
