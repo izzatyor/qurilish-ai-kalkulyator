@@ -1,13 +1,16 @@
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { estimate, type Estimate, type RoomInput, type Tier } from '@/lib/estimate'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { supabase } from '@/lib/supabase'
+import { DEFAULT_PRICES, estimate, type Estimate, type PriceMap, type RoomInput, type Tier } from '@/lib/estimate'
 
 interface EstimateContextValue {
   input: RoomInput
   result: Estimate
   setDimension: (key: 'width' | 'length' | 'height', value: number) => void
   setTier: (tier: Tier) => void
+  /** Narxlar Supabase'dan hali yuklanayotgan bo'lsa true (statik defaultlar ishlatiladi) */
+  pricesLoading: boolean
 }
 
 const EstimateContext = createContext<EstimateContextValue | null>(null)
@@ -16,15 +19,43 @@ const DEFAULT_INPUT: RoomInput = { width: 4.2, length: 3.5, height: 2.8, tier: '
 
 export function EstimateProvider({ children }: { children: ReactNode }) {
   const [input, setInput] = useState<RoomInput>(DEFAULT_INPUT)
+  // Sahifa ochilganda avval statik narxlar bilan ishlaymiz (kalkulyator darhol
+  // ko'rinadi), keyin fonda Supabase'dan haqiqiy narxlarni olib, ularni almashtiramiz.
+  const [prices, setPrices] = useState<PriceMap>(DEFAULT_PRICES)
+  const [pricesLoading, setPricesLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    supabase
+      .from('materials')
+      .select('id, price')
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || !data || data.length === 0) {
+          console.error('Supabase\'dan narxlarni olishda xatolik, statik narxlar ishlatilmoqda:', error?.message)
+          setPricesLoading(false)
+          return
+        }
+        const fresh: PriceMap = Object.fromEntries(data.map((m) => [m.id, m.price]))
+        setPrices((prev) => ({ ...prev, ...fresh }))
+        setPricesLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const value = useMemo<EstimateContextValue>(
     () => ({
       input,
-      result: estimate(input),
+      result: estimate(input, prices),
       setDimension: (key, v) => setInput((s) => ({ ...s, [key]: v })),
       setTier: (tier) => setInput((s) => ({ ...s, tier })),
+      pricesLoading,
     }),
-    [input],
+    [input, prices, pricesLoading],
   )
 
   return <EstimateContext.Provider value={value}>{children}</EstimateContext.Provider>

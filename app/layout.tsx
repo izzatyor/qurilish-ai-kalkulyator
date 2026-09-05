@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, IBM_Plex_Sans } from 'next/font/google'
+import { AuthProvider } from '@/components/auth-context'
 import './globals.css'
 
 const heading = Space_Grotesk({
@@ -52,8 +53,10 @@ export default function RootLayout({
   return (
     <html lang="uz" className={`bg-background ${heading.variable} ${body.variable}`}>
       <body className="antialiased font-sans">
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <AuthProvider>
+          {children}
+          {process.env.NODE_ENV === 'production' && <Analytics />}
+        </AuthProvider>
       </body>
     </html>
   )

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Ruler } from 'lucide-react'
+import { AuthStatus } from '@/components/auth-status'
 
 export function SiteHeader() {
   return (
@@ -25,12 +26,7 @@ export function SiteHeader() {
           </Link>
         </nav>
 
-        <Link
-          href="/#kalkulyator"
-          className="border border-foreground px-4 py-1.5 font-heading text-sm font-medium transition-colors hover:bg-foreground hover:text-primary-foreground"
-        >
-          Kirish
-        </Link>
+        <AuthStatus />
       </div>
     </header>
   )
