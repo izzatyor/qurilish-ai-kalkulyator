@@ -33,12 +33,12 @@ export function RoomDiagram() {
 
   const wall = 10 // wall thickness in drawing units
 
-  // Door on bottom wall, 0.9 m wide, near left corner
-  const doorW = Math.min(0.9 * scale, rw * 0.4)
+  // Door on bottom wall, near left corner — kiritilgan sozlamaga mos kenglik
+  const doorW = Math.min((input.doorCount > 0 ? input.doorWidth : 0) * scale, rw * 0.4)
   const doorX = x0 + Math.min(0.5 * scale, rw * 0.15)
 
-  // Window on top wall, 1.5 m, centered
-  const winW = Math.min(1.5 * scale, rw * 0.6)
+  // Window on top wall, centered — kiritilgan sozlamaga mos kenglik
+  const winW = Math.min((input.windowCount > 0 ? input.windowWidth : 0) * scale, rw * 0.6)
   const winX = x0 + (rw - winW) / 2
 
   const dimTop = y0 - wall - 32
@@ -179,7 +179,7 @@ export function RoomDiagram() {
             fontSize="10"
             className="fill-muted-foreground tabular"
           >
-            0.90
+            {input.doorCount > 0 ? formatNum(input.doorWidth, 2) : '—'}
           </text>
 
           {/* Window callout */}
@@ -190,7 +190,7 @@ export function RoomDiagram() {
             fontSize="10"
             className="fill-muted-foreground tabular"
           >
-            1.50
+            {input.windowCount > 0 ? formatNum(input.windowWidth, 2) : '—'}
           </text>
 
           {/* Height annotation (left) */}

@@ -9,7 +9,7 @@ export function FinalCta() {
             hisob bilan boshlang
           </h2>
           <p className="max-w-lg text-pretty leading-relaxed text-foreground/80">
-            Bepul, ro‘yxatdan o‘tishsiz. O‘zbekiston bo‘yicha 12 000+ smeta shu kalkulyator yordamida tuzilgan.
+            Bepul, ro‘yxatdan o‘tishsiz. Joriy bozor narxlari asosida, bir necha soniyada.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -34,7 +34,7 @@ export function FinalCta() {
 export function SiteFooter() {
   return (
     <footer className="bg-primary text-primary-foreground">
-      <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-10 text-sm md:grid-cols-[1fr_auto_auto] md:items-start">
+      <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-10 text-sm md:grid-cols-[1fr_auto] md:items-start">
         <div className="flex flex-col gap-2">
           <span className="font-heading text-base font-semibold">Smeta AI</span>
           <p className="max-w-xs text-primary-foreground/70">
@@ -52,14 +52,6 @@ export function SiteFooter() {
             Qanday ishlaydi
           </a>
         </nav>
-        <div className="flex flex-col gap-2 text-primary-foreground/80">
-          <a href="mailto:salom@smeta.uz" className="hover:text-primary-foreground">
-            salom@smeta.uz
-          </a>
-          <a href="tel:+998712000000" className="tabular hover:text-primary-foreground">
-            +998 71 200 00 00
-          </a>
-        </div>
       </div>
       <div className="border-t border-primary-foreground/20">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-4 text-xs text-primary-foreground/60 sm:flex-row sm:justify-between">

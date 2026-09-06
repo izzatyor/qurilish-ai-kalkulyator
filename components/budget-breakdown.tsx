@@ -7,6 +7,7 @@ import { useEstimate } from '@/components/estimate-context'
 import { useAuth } from '@/components/auth-context'
 import { saveCalculation } from '@/lib/calculations'
 import { TIER_LABELS, formatNum, formatUZS } from '@/lib/estimate'
+import { MATERIALS } from '@/lib/materials'
 
 export function BudgetBreakdown() {
   const {
@@ -24,6 +25,24 @@ export function BudgetBreakdown() {
   const [shareState, setShareState] = useState<'idle' | 'copied'>('idle')
   const [addOpen, setAddOpen] = useState(false)
   const [form, setForm] = useState({ name: '', spec: '', qty: '1', unit: 'dona', unitPrice: '' })
+  // Miqdor maydonlari uchun vaqtinchalik matn holati. Bu yo'q bo'lsa, foydalanuvchi
+  // raqamni o'chirib qayta yozmoqchi bo'lganda maydon avtomatik eski qiymatga qaytib
+  // ketadi (chunki input to'g'ridan-to'g'ri hisoblangan raqamga bog'langan bo'lardi).
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({})
+
+  const commitQty = (id: string, isCustom: boolean) => {
+    const raw = qtyDrafts[id]
+    if (raw === undefined) return
+    const v = parseFloat(raw.replace(',', '.'))
+    if (Number.isFinite(v) && v >= 0) {
+      isCustom ? updateCustomMaterial(id, { qty: v }) : setQty(id, v)
+    }
+    setQtyDrafts((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
 
   const handleAddSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -33,6 +52,20 @@ export function BudgetBreakdown() {
     addCustomMaterial({ name: form.name.trim(), spec: form.spec.trim(), qty, unit: form.unit.trim() || 'dona', unitPrice })
     setForm({ name: '', spec: '', qty: '1', unit: 'dona', unitPrice: '' })
     setAddOpen(false)
+  }
+
+  /** Nom maydonidan chiqilganda, agar katalogda aynan shu nomdagi material bo'lsa,
+   * uning tavsifi/birligi/narxini avtomatik to'ldiradi — foydalanuvchi qo'lda
+   * qidirib narx yozishga majbur bo'lmaydi. */
+  const handleNameBlur = () => {
+    const match = MATERIALS.find((mat) => mat.name.toLowerCase() === form.name.trim().toLowerCase())
+    if (!match) return
+    setForm((s) => ({
+      ...s,
+      spec: s.spec || match.spec,
+      unit: match.unit,
+      unitPrice: s.unitPrice || String(match.price),
+    }))
   }
 
   const handleSave = async () => {
@@ -201,24 +234,29 @@ export function BudgetBreakdown() {
                       <td className="tabular py-3 pr-3 text-right font-heading">
                         <div className="flex items-center justify-end gap-1.5 print:hidden">
                           <input
-                            type="number"
+                            type="text"
                             inputMode="decimal"
-                            min={0}
-                            step={0.1}
-                            value={m.qty}
+                            value={qtyDrafts[m.id] ?? formatNum(m.qty, 2)}
                             disabled={m.excluded}
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value)
-                              if (!Number.isFinite(v) || v < 0) return
-                              isCustom ? updateCustomMaterial(m.id, { qty: v }) : setQty(m.id, v)
+                            onChange={(e) => setQtyDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                            onBlur={() => commitQty(m.id, isCustom)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') e.currentTarget.blur()
                             }}
-                            className="w-16 border-b border-primary-foreground/40 bg-transparent py-0.5 text-right tabular outline-none focus:border-accent disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className="w-16 border-b border-primary-foreground/40 bg-transparent py-0.5 text-right tabular outline-none focus:border-accent disabled:opacity-50"
                           />
                           <span className="text-xs text-primary-foreground/60">{m.unit}</span>
                           {!isCustom && (
                             <button
                               type="button"
-                              onClick={() => resetQty(m.id)}
+                              onClick={() => {
+                                setQtyDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[m.id]
+                                  return next
+                                })
+                                resetQty(m.id)
+                              }}
                               title="Avtomatik hisoblangan miqdorga qaytarish"
                               aria-label="Avtomatik miqdorga qaytarish"
                               className="text-primary-foreground/40 transition-colors hover:text-accent"
@@ -301,11 +339,18 @@ export function BudgetBreakdown() {
                     <label className="text-xs text-primary-foreground/60">Nomi</label>
                     <input
                       required
+                      list="material-suggestions"
                       value={form.name}
                       onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                      onBlur={handleNameBlur}
                       placeholder="Masalan: Kafel"
                       className="border-b-2 border-primary-foreground/50 bg-transparent py-1 text-sm outline-none focus:border-accent"
                     />
+                    <datalist id="material-suggestions">
+                      {MATERIALS.map((mat) => (
+                        <option key={mat.id} value={mat.name} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-primary-foreground/60">Tavsif (ixtiyoriy)</label>

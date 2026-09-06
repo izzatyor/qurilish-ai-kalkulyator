@@ -40,7 +40,10 @@ export default async function MateriallarPage() {
             <dl className="mt-10 grid grid-cols-2 border border-foreground sm:grid-cols-4">
               <Stat label="Pozitsiyalar" value={String(materials.length)} />
               <Stat label="Bo‘limlar" value={String(CATEGORY_ORDER.length)} />
-              <Stat label="Yangilangan" value="05.09.2026" />
+              <Stat
+                label="Yangilangan"
+                value={new Date().toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              />
               <Stat label="Valyuta" value="so‘m" last />
             </dl>
           </div>
